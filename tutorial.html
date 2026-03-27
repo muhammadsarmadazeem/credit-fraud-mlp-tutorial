@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b6e69" />
+  <title>Neural Network Capacity, Imbalance, and Generalisation</title>
+  <style>
+    :root{
+      --bg:#f6f8fc;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#475569;
+      --accent:#0b6e69;
+      --accent-2:#1d4ed8;
+      --border:#d7e0ee;
+      --shadow:0 10px 34px rgba(15, 23, 42, 0.08);
+      --radius:18px;
+      --radius-sm:14px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0b1220;
+        --card:#121a2a;
+        --text:#e5eaf3;
+        --muted:#a8b3c7;
+        --accent:#39c7be;
+        --accent-2:#7cb3ff;
+        --border:#243244;
+        --shadow:0 16px 48px rgba(0,0,0,0.45);
+      }
+    }
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none !important; transition:none !important;}
+      html{scroll-behavior:auto;}
+    }
+
+    *{box-sizing:border-box;}
+    html{scroll-behavior:smooth;}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height:1.65;
+    }
+
+    .skip{
+      position:absolute; left:-9999px; top:auto;
+      width:1px; height:1px; overflow:hidden;
+    }
+    .skip:focus{
+      left:1rem; top:1rem; width:auto; height:auto;
+      padding:.65rem 1rem;
+      background:var(--card);
+      border:2px solid var(--accent);
+      border-radius:12px;
+      z-index:999;
+    }
+
+    .progress{
+      position:fixed; left:0; top:0;
+      height:4px;
+      width:0%;
+      background:linear-gradient(90deg, var(--accent), var(--accent-2));
+      z-index:1000;
+    }
+
+    .wrap{
+      max-width:1120px;
+      margin:0 auto;
+      padding:1.2rem;
+    }
+
+    header.hero{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      padding:1.35rem 1.25rem 1.1rem;
+      box-shadow:var(--shadow);
+      position:relative;
+      overflow:hidden;
+      margin-top:.75rem;
+    }
+    header.hero::before{
+      content:"";
+      position:absolute; inset:-2rem;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 0%, rgba(11,110,105,0.18), transparent 55%),
+        radial-gradient(ellipse 60% 50% at 85% 25%, rgba(29,78,216,0.14), transparent 55%);
+      pointer-events:none;
+    }
+    header.hero > *{position:relative; z-index:1;}
+
+    .badges{display:flex; flex-wrap:wrap; gap:.45rem; margin:.65rem 0 1rem;}
+    .pill{
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:.24rem .75rem;
+      font-size:.82rem;
+      color:var(--accent);
+      background:rgba(11,110,105,0.08);
+      font-weight:600;
+    }
+
+    h1{
+      margin:.2rem 0 .45rem;
+      font-size:2.0rem;
+      letter-spacing:-0.02em;
+      line-height:1.15;
+    }
+    .lead{color:var(--muted); margin:.25rem 0 .85rem; max-width:72ch;}
+
+    a{color:var(--accent-2);}
+    a:hover{filter:brightness(1.05);}
+
+    code{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background:rgba(125,125,125,0.12);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:.08rem .45rem;
+      font-size:.93em;
+      white-space:nowrap;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:1rem;
+      align-items:start;
+      margin-top:1rem;
+    }
+    @media(min-width:980px){
+      .grid{grid-template-columns: 305px 1fr;}
+    }
+
+    nav.toc{
+      position:sticky; top:1rem;
+      align-self:start;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius-sm);
+      padding:.9rem .9rem .85rem;
+      box-shadow:0 6px 22px rgba(15,23,42,0.06);
+    }
+    nav.toc h2{
+      font-size:.82rem;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      color:var(--muted);
+      margin:.15rem 0 .75rem;
+    }
+    nav.toc ul{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.3rem;}
+    nav.toc a{
+      display:block;
+      text-decoration:none;
+      color:var(--muted);
+      padding:.45rem .6rem;
+      border-radius:14px;
+      border-left:3px solid transparent;
+      transition: background .2s ease, border-color .2s ease, color .2s ease;
+      font-size:.93rem;
+    }
+    nav.toc a:hover{background:rgba(11,110,105,0.10); color:var(--text); border-left-color:var(--accent);}
+    nav.toc a.active{background:rgba(11,110,105,0.12); color:var(--text); border-left-color:var(--accent);}
+
+    main.content{min-width:0;}
+
+    section.card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      padding:1.1rem 1.1rem .95rem;
+      margin-bottom:1rem;
+      box-shadow:0 4px 16px rgba(15,23,42,0.04);
+      opacity:0;
+      transform: translateY(14px);
+      transition: opacity .55s ease, transform .55s ease;
+    }
+    section.card.visible{
+      opacity:1; transform: translateY(0);
+    }
+
+    section.card h2{
+      margin:.15rem 0 .7rem;
+      font-size:1.25rem;
+      color:var(--accent);
+      letter-spacing:-0.01em;
+    }
+
+    .note{
+      border-left:4px solid var(--accent);
+      background:rgba(11,110,105,0.08);
+      padding:.7rem .9rem;
+      border-radius:12px;
+      color:var(--text);
+      margin:.75rem 0;
+    }
+
+    figure{
+      margin:1rem 0;
+      border:1px solid var(--border);
+      border-radius:16px;
+      overflow:hidden;
+      background:var(--card);
+    }
+    figure img{width:100%; height:auto; display:block;}
+    figcaption{
+      padding:.7rem .85rem;
+      color:var(--muted);
+      border-top:1px solid var(--border);
+      font-size:.98rem;
+    }
+
+    details{
+      background:rgba(11,110,105,0.06);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:.75rem .9rem;
+      margin:1rem 0;
+    }
+    summary{cursor:pointer; font-weight:700; color:var(--text);}
+
+    footer.site-footer{
+      color:var(--muted);
+      text-align:center;
+      padding:2rem 1rem 3rem;
+      font-size:.95rem;
+    }
+
+    @media print{
+      .progress, nav.toc, details{display:none !important;}
+      section.card{box-shadow:none;}
+      header.hero{box-shadow:none;}
+      body{background:#fff; color:#000;}
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header class="hero" aria-labelledby="page-title">
+      <h1 id="page-title">How Neural Network Capacity and Class Imbalance Affect Generalisation</h1>
+      <p class="lead">A focused tutorial on MLP architecture, overfitting, and minority-class detection in credit card fraud data.</p>
+      <div class="badges" aria-label="Tutorial topics">
+        <span class="pill">Neural networks</span>
+        <span class="pill">Imbalanced learning</span>
+        <span class="pill">Fraud detection</span>
+        <span class="pill">Generalisation</span>
+      </div>
+      <p class="lead" style="margin-top:.25rem;">
+        <strong>GitHub repository:</strong>
+        <a href="https://github.com/YOUR_USERNAME/YOUR_REPO_NAME">https://github.com/YOUR_USERNAME/YOUR_REPO_NAME</a>
+        <span style="color:var(--muted);">(replace with your final link before submission)</span>
+      </p>
+    </header>
+
+    <div class="grid">
+      <aside aria-label="Table of contents">
+        <nav class="toc" id="toc">
+          <h2>Contents</h2>
+          <ul>
+            <li><a href="#s1">1) Objective</a></li>
+            <li><a href="#s2">2) Dataset</a></li>
+            <li><a href="#s3">3) Experimental design</a></li>
+            <li><a href="#s4">4) Capacity vs minority</a></li>
+            <li><a href="#s5">5) Depth &amp; regularisation</a></li>
+            <li><a href="#s6">6) Threshold tuning</a></li>
+            <li><a href="#s7">7) Robustness</a></li>
+            <li><a href="#s8">8) Baselines &amp; curves</a></li>
+            <li><a href="#s9">9) Why results happen</a></li>
+            <li><a href="#s10">10) Takeaways</a></li>
+            <li><a href="#s11">11) Ethics</a></li>
+            <li><a href="#s12">12) Accessibility</a></li>
+            <li><a href="#srefs">References</a></li>
+          </ul>
+        </nav>
+      </aside>
+
+      <main class="content" id="main">
+        <section class="card" id="s1">
+          <h2>1) Objective and focus</h2>
+          <p>
+            The central question is:
+            <em>How does increasing neural-network capacity influence generalisation and minority-class detection in highly imbalanced data?</em>
+            I focus on a Multilayer Perceptron (MLP) because it is familiar from class, but extend it with a real-world challenge: extreme class imbalance.
+          </p>
+          <p>
+            This tutorial prioritises <strong>Precision</strong>, <strong>Recall</strong>, <strong>F1</strong>, and <strong>PR-AUC</strong> over accuracy because fraud detection must perform well on the minority class.
+          </p>
+        </section>
+
+        <section class="card" id="s2">
+          <h2>2) Dataset and why it is technically meaningful</h2>
+          <p>
+            I use the Kaggle <strong>Credit Card Fraud Detection</strong> dataset (Worldline + ULB collaboration): 284,807 transactions with only 492 frauds (~0.172% positive class).
+            Features <code>V1..V28</code> are PCA components; <code>Time</code> and <code>Amount</code> are not PCA-transformed; <code>Class</code> is the target.
+          </p>
+          <div class="note">
+            Confusion-matrix accuracy alone is not meaningful here. The dataset creators explicitly recommend PR-focused evaluation.
+          </div>
+          <figure>
+            <img src="figures/class_imbalance_log.png" loading="lazy" alt="Bar chart on log scale showing huge class imbalance: many non-fraud transactions and very few fraud transactions." />
+            <figcaption>Figure 1. Extreme class imbalance (log-scale count).</figcaption>
+          </figure>
+        </section>
+
+        <section class="card" id="s3">
+          <h2>3) Experimental design</h2>
+          <p>The notebook compares three imbalance strategies:</p>
+          <ul>
+            <li><strong>Baseline:</strong> no balancing intervention.</li>
+            <li><strong>Class-weighted training:</strong> higher minority penalty through sample weighting.</li>
+            <li><strong>Random undersampling:</strong> reduce majority examples to create a balanced train subset.</li>
+          </ul>
+          <p>I then sweep model capacity using MLP hidden-layer configurations:</p>
+          <ul>
+            <li><strong>Width sweep:</strong> one hidden layer with widths 16, 32, 64, 128.</li>
+            <li><strong>Depth sweep:</strong> (64), (64,64), (64,64,64).</li>
+          </ul>
+          <p>
+            Generalisation is analysed using a PR-AUC gap: <code>train PR-AUC - test PR-AUC</code>. A larger gap indicates more overfitting.
+          </p>
+          <details>
+            <summary>Why PR-AUC?</summary>
+            <p style="margin:.4rem 0 0;">
+              Under extreme imbalance, ROC-AUC can look deceptively stable. PR-AUC focuses directly on precision/recall trade-offs for rare fraud cases.
+            </p>
+          </details>
+        </section>
+
+        <section class="card" id="s4">
+          <h2>4) Capacity versus minority-class performance</h2>
+          <p>
+            The first key result is that increasing width does not guarantee better fraud detection.
+            Some settings improve train fit but fail to improve test PR-AUC.
+            This demonstrates that larger capacity can overfit majority patterns, especially under severe imbalance.
+          </p>
+          <figure>
+            <img src="figures/width_vs_pr_auc_by_strategy.png" loading="lazy" alt="Line chart comparing test PR-AUC across hidden-layer widths for baseline, class-weighted, and undersampling strategies." />
+            <figcaption>Figure 2. Width vs test PR-AUC by imbalance strategy.</figcaption>
+          </figure>
+          <figure>
+            <img src="figures/width_vs_gap_by_strategy.png" loading="lazy" alt="Line chart showing PR-AUC generalisation gap across hidden-layer widths for three imbalance strategies." />
+            <figcaption>Figure 3. Width vs generalisation gap by imbalance strategy.</figcaption>
+          </figure>
+        </section>
+
+        <section class="card" id="s5">
+          <h2>5) Depth effects and regularisation</h2>
+          <p>
+            Depth experiments show whether additional layers help fraud-focused metrics or just increase complexity.
+            I also vary L2 regularisation (<code>alpha</code>) to show the trade-off between fitting capacity and overfitting control.
+          </p>
+          <figure>
+            <img src="figures/depth_metrics_baseline.png" loading="lazy" alt="Bar chart comparing baseline MLP depth configurations on test PR-AUC and F1 score." />
+            <figcaption>Figure 4. Depth effects on PR-AUC and F1.</figcaption>
+          </figure>
+          <figure>
+            <img src="figures/alpha_regularisation_tradeoff.png" loading="lazy" alt="Line chart of regularisation alpha against test PR-AUC and PR-AUC generalisation gap." />
+            <figcaption>Figure 5. Regularisation trade-off: minority performance vs overfitting.</figcaption>
+          </figure>
+        </section>
+
+        <section class="card" id="s6">
+          <h2>6) Threshold tuning and operational decision-making</h2>
+          <p>
+            Fraud detection is a decision system, not only a probability system. A default threshold of 0.5 can be far from optimal under heavy imbalance.
+            I analyse precision/recall/F1 across thresholds and select a threshold that maximises F1 for the selected model.
+          </p>
+          <figure>
+            <img src="figures/threshold_tuning_precision_recall_f1.png" loading="lazy" alt="Two-panel figure: left panel shows precision, recall, and F1 versus threshold with a marked best-F1 threshold; right panel shows precision-recall curve." />
+            <figcaption>Figure 6. Threshold sensitivity and precision-recall curve.</figcaption>
+          </figure>
+        </section>
+
+        <section class="card" id="s7">
+          <h2>7) Robustness across random seeds</h2>
+          <p>
+            To avoid over-interpreting single-run results, training is repeated across multiple random seeds and variability is reported (mean ± standard deviation).
+            This improves methodological quality and makes conclusions more trustworthy.
+          </p>
+          <figure>
+            <img src="figures/seed_robustness_metrics.png" loading="lazy" alt="Bar chart with error bars showing mean and standard deviation across seeds for PR-AUC, precision, recall, and F1." />
+            <figcaption>Figure 7. Robustness across random seeds.</figcaption>
+          </figure>
+        </section>
+
+        <section class="card" id="s8">
+          <h2>8) Baseline models and curve-level comparison</h2>
+          <p>
+            To test uniqueness and technical rigor, the best MLP is compared against <strong>Logistic Regression</strong> and <strong>Random Forest</strong>.
+            This addresses a key scientific question: is neural capacity genuinely useful here?
+          </p>
+          <figure>
+            <img src="figures/baseline_pr_roc_compare.png" loading="lazy" alt="Two-panel comparison of models. Left: precision-recall curves for Logistic Regression, Random Forest, and best MLP. Right: ROC curves for the same models." />
+            <figcaption>Figure 8. PR and ROC curve comparison.</figcaption>
+          </figure>
+          <figure>
+            <img src="figures/baseline_metric_bar_compare.png" loading="lazy" alt="Bar chart comparing PR-AUC, ROC-AUC, precision, recall, and F1 for Logistic Regression, Random Forest, and best MLP." />
+            <figcaption>Figure 9. Metric-level comparison across models.</figcaption>
+          </figure>
+        </section>
+
+        <section class="card" id="s9">
+          <h2>9) Why results behave this way</h2>
+          <ul>
+            <li><strong>Capacity overfitting mechanism:</strong> widening/deepening networks increases representational freedom, which can capture majority-class noise.</li>
+            <li><strong>Undersampling trade-off:</strong> it boosts fraud visibility but removes legitimate samples, which can destabilise decision boundaries.</li>
+            <li><strong>PR-AUC vs ROC-AUC:</strong> ROC-AUC can remain high in rare-event problems, while PR-AUC drops quickly when false positives rise.</li>
+            <li><strong>Threshold effect:</strong> probabilities are rankings; operating choices depend on threshold tuning.</li>
+          </ul>
+        </section>
+
+        <section class="card" id="s10">
+          <h2>10) Teaching takeaways for practitioners</h2>
+          <ol>
+            <li>For imbalanced problems, start with PR-AUC/Recall/F1, not accuracy.</li>
+            <li>Tune capacity gradually (width/depth) and inspect the train-test gap.</li>
+            <li>Treat imbalance handling and threshold tuning as part of model design.</li>
+            <li>Use regularisation to stabilise generalisation before scaling architecture.</li>
+            <li>Check multi-seed robustness before claiming improvements.</li>
+            <li>Always compare against strong non-neural baselines.</li>
+          </ol>
+        </section>
+
+        <section class="card" id="s11">
+          <h2>11) Limitations, ethics, and responsible use</h2>
+          <p>
+            This tutorial is empirical and educational, not a production fraud system. Real deployments require drift monitoring, threshold calibration by business cost, privacy controls, and human review loops.
+          </p>
+          <p>
+            Ethical AI concerns include false positives that affect customers, unequal impact across user groups, and transparency in decision support.
+          </p>
+        </section>
+
+        <section class="card" id="s12">
+          <h2>12) Accessibility checklist</h2>
+          <ul>
+            <li>Semantic heading structure for screen readers.</li>
+            <li>Alt text for every figure.</li>
+            <li>Reduced-motion support through <code>prefers-reduced-motion</code>.</li>
+            <li>Plots use color-blind-friendly palettes plus marker/line-style differences.</li>
+          </ul>
+        </section>
+
+        <section class="card" id="srefs">
+          <h2>References</h2>
+          <ol>
+            <li>Pedregosa, F. et al. (2011). <em>Scikit-learn: Machine Learning in Python</em>. JMLR.</li>
+            <li>Goodfellow, I., Bengio, Y., Courville, A. (2016). <em>Deep Learning</em>. MIT Press.</li>
+            <li>Kaggle Credit Card Fraud Dataset: <a href="https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud">https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud</a></li>
+            <li>Dal Pozzolo, A. et al. (2014, 2015, 2018) and related fraud-detection papers cited on dataset page.</li>
+          </ol>
+          <footer class="site-footer">
+            Submission includes: tutorial webpage, full notebook code, references, README, license, and reproducible figure generation.
+          </footer>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var progress = document.getElementById("progress");
+      function onScroll() {
+        var doc = document.documentElement;
+        var denom = (doc.scrollHeight - doc.clientHeight);
+        var p = denom > 0 ? (doc.scrollTop / denom) * 100 : 0;
+        progress.style.width = Math.min(100, Math.max(0, p)) + "%";
+      }
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+
+      var links = document.querySelectorAll("nav.toc a[href^='#']");
+      var targets = [];
+      links.forEach(function (a) {
+        var id = a.getAttribute("href").slice(1);
+        var el = document.getElementById(id);
+        if (el) targets.push(el);
+      });
+
+      if ("IntersectionObserver" in window) {
+        var ioActive = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (!en.isIntersecting) return;
+            var id = en.target.id;
+            links.forEach(function (l) { l.classList.remove("active"); });
+            var active = document.querySelector("nav.toc a[href='#" + id + "']");
+            if (active) active.classList.add("active");
+          });
+        }, { threshold: 0.25, rootMargin: "-15% 0px -60% 0px" });
+
+        targets.forEach(function (t) { ioActive.observe(t); });
+
+        var ioReveal = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (en.isIntersecting) en.target.classList.add("visible");
+          });
+        }, { threshold: 0.08 });
+
+        document.querySelectorAll("section.card").forEach(function (s) { ioReveal.observe(s); });
+      } else {
+        document.querySelectorAll("section.card").forEach(function (s) { s.classList.add("visible"); });
+      }
+    })();
+  </script>
+</body>
+</html>
