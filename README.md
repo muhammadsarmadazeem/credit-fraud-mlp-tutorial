@@ -29,6 +29,8 @@ After execution:
 - figures are saved in `figures/`
 - `tutorial.html` displays the generated figures.
 
+GitHub repository: `https://github.com/muhammadsarmadazeem/credit-fraud-mlp-tutorial`
+
 ## What is investigated
 
 - MLP capacity (width and depth)
@@ -53,15 +55,6 @@ After execution:
 - Non-color visual encodings (markers/line styles)
 - Reduced-motion support in webpage
 
-## GitHub link reminder
-
-Before submission, replace placeholder URLs in:
-- `README.md`
-- `tutorial.html`
-- any PDF export (if you export one)
-
-Repository placeholder:
-`https://github.com/YOUR_USERNAME/YOUR_REPO_NAME`
 
 ## References
 
